@@ -48,8 +48,13 @@
     (:datagram
      (with-mapped-conditions ()
        (make-datagram-socket
-	 (ccl::open-udp-socket :local-address (and local-host (host-to-hbo local-host))
-			       :local-port local-port))))))
+        (ccl::open-udp-socket :local-address (and local-host (host-to-hbo local-host))
+                              :local-port local-port))))))
+
+(defun file-socket-connect (file &key (type :stream) (element-type 'character) local-filename)
+  (declare (ignore file type element-type local-filename))
+  (unsupported 'file-socket 'file-socket-connect))
+
 
 (defun socket-listen (host port
                            &key reuseaddress
@@ -57,13 +62,18 @@
                            (backlog 5)
                            (element-type 'character))
   (let* ((reuseaddress (if reuse-address-supplied-p reuse-address reuseaddress))
-	 (socket (with-mapped-conditions ()
-		   (make-instance 'passive-socket 
-				  :local-port port
-				  :local-host (host-to-hbo host)
-				  :reuse-address reuseaddress
-				  :backlog backlog))))
+         (socket (with-mapped-conditions ()
+                   (make-instance 'passive-socket
+                                  :local-port port
+                                  :local-host (host-to-hbo host)
+                                  :reuse-address reuseaddress
+                                  :backlog backlog))))
     (make-stream-server-socket socket :element-type element-type)))
+
+(defun file-socket-listen (file &key (backlog 5) (element-type 'character))
+  (declare (ignore file backlog element-type))
+  (unsupported 'file-socket 'file-socket-listen))
+
 
 (defmethod socket-accept ((usocket stream-server-usocket) &key element-type)
   (let* ((socket (socket usocket))

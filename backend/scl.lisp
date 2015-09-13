@@ -28,13 +28,28 @@
 			   :socket socket
 			   :condition condition))))
 
+(defun %get-stream-usocket (socket element-type)
+  "Get a stream-usocket for a socket with an element-type"
+  (let ((stream (sys:make-fd-stream socket :input t :output t
+                                    :element-type element-type
+                                    :buffering :full)))
+    (make-stream-socket :socket socket :stream stream)))
+
+(defun %get-datagram-usocket (socket connected-p)
+  "Get a datagram-usocket for a socket."
+  (let ((usocket (make-datagram-socket socket :connected-p connected-p)))
+    (ext:finalize usocket #'(lambda ()
+                              (when (%open-p usocket)
+                                (ext:close-socket socket))))
+    usocket))
+
 (defun socket-connect (host port &key (protocol :stream) (element-type 'character)
                        timeout deadline (nodelay t nodelay-specified)
 		       (local-host nil local-host-p)
 		       (local-port nil local-port-p)
 		       &aux
 		       (patch-udp-p (fboundp 'ext::inet-socket-send-to)))
-  (when (and nodelay-specified 
+  (when (and nodelay-specified
              (not (eq nodelay :if-supported)))
     (unsupported 'nodelay 'socket-connect))
   (when deadline (unsupported 'deadline 'socket-connect))
@@ -54,10 +69,7 @@
 					  :local-port local-port)))
 		      (with-mapped-conditions (socket)
 			(apply #'ext:connect-to-inet-socket args))))
-       (let ((stream (sys:make-fd-stream socket :input t :output t
-					 :element-type element-type
-					 :buffering :full)))
-	 (make-stream-socket :socket socket :stream stream)))
+       (%get-stream-usocket socket element-type))
       (:datagram
        (when (not patch-udp-p)
 	 (error 'unsupported
@@ -83,11 +95,7 @@
 							     (host-to-hbo local-host)))))
 		     (with-mapped-conditions ()
 		       (ext:create-inet-socket protocol)))))
-       (let ((usocket (make-datagram-socket socket :connected-p (and host port t))))
-	 (ext:finalize usocket #'(lambda ()
-				   (when (%open-p usocket)
-				     (ext:close-socket socket))))
-	 usocket)))))
+       (%get-datagram-usocket socket (and host port t))))))
 
 (defun socket-listen (host port
                            &key reuseaddress
@@ -108,12 +116,41 @@
 
 (defmethod socket-accept ((usocket stream-server-usocket) &key element-type)
   (with-mapped-conditions (usocket)
-    (let* ((sock (ext:accept-tcp-connection (socket usocket)))
-           (stream (sys:make-fd-stream sock :input t :output t
-                                      :element-type (or element-type
-                                                        (element-type usocket))
-                                      :buffering :full)))
-      (make-stream-socket :socket sock :stream stream))))
+    (let ((sock (ext:accept-tcp-connection (socket usocket))))
+      (%get-stream-usocket sock (or element-type
+                                    (element-type usocket))))))
+
+(defclass unix-server-stream-usocket (stream-server-usocket) ())
+
+(defun file-socket-connect (file &key (type :stream) (element-type 'character) local-filename
+                                   &aux (patch-udp-p (fboundp 'ext::inet-socket-send-to)))
+  (let (socket)
+    (with-mapped-conditions (socket)
+      (ecase type
+        (:stream
+         (setf socket (ext:connect-to-unix-socket file :kind :stream))
+         (%get-stream-usocket socket element-type))
+        (:datagram
+         (when (not patch-udp-p)
+           (unsupported '(protocol :datagram) 'file-socket-connect :minumum "1.3.9"))
+         (setf socket
+               (if file
+                   (ext:connect-to-unix-socket file :kind :datagram)
+                   (if local-filename
+                       (ext:create-unix-listener local-filename :datagram)
+                       (ext:create-unix-socket :datagram))))
+         (%get-datagram-usocket socket (and file t)))))))
+
+(defun file-socket-listen (file &key (backlog 5) (element-type 'character))
+  (with-mapped-conditions ()
+    (let ((sock (ext:create-unix-listener file :stream)))
+      (make-instance 'unix-server-stream-usocket :socket sock :element-type element-type))))
+
+(defmethod socket-accept ((usocket unix-server-stream-usocket) &key element-type)
+  (with-mapped-conditions (usocket)
+    (let ((sock (ext:accept-unix-connection (socket usocket))))
+      (%get-stream-usocket sock (or element-type
+                                    (element-type usocket))))))
 
 ;; Sockets and their associated streams are modelled as
 ;; different objects. Be sure to close the socket stream
@@ -270,4 +307,3 @@
                 (let ((flags (sys:sap-ref-16 fds-sap (+ base 6))))
                   (unless (zerop (logand flags unix::pollin))
                     (setf (state (first sockets)) :READ))))))))))
-

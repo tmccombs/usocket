@@ -148,6 +148,13 @@
      #-(or rawsock ffi)
      (unsupported '(protocol :datagram) 'socket-connect))))
 
+(defun file-socket-connect (file &key type element-type local-filename)
+  (declare (ignore file type element-type local-filename))
+  ;;; We could potentially implement this using rawsock or ffi
+  ;;; but then we would have to implement all of the stream and stream-server
+  ;;; functionality for raw sockets as well, so I am not doing it right now.
+  (unimplemented 'file-socket 'file-socket-connect))
+
 (defun socket-listen (host port
                            &key reuseaddress
                            (reuse-address nil reuse-address-supplied-p)
@@ -163,6 +170,11 @@
                                (list :interface host))))))
     (with-mapped-conditions ()
         (make-stream-server-socket sock :element-type element-type))))
+
+(defun file-socket-listen (file &key (backlog 5) (element-type 'character))
+  (declare (ignore file backlog element-type))
+  ;;; see file-socket-connect
+  (unimplemented 'file-socket 'file-socket-listen))
 
 (defmethod socket-accept ((socket stream-server-usocket) &key element-type)
   (let ((stream

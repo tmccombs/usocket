@@ -234,6 +234,10 @@
 	   (jcall $@setSoTimeout/DatagramSocket/1 socket (truncate (* 1000 timeout)))))))
     usocket))
 
+(defun file-socket-connect (file &key type element-type local-filename )
+  (declare (ignore file type element-type local-filename))
+  (unsupported :file-socket 'file-socket-connect))
+
 ;;; SOCKET-LISTEN
 
 (defun socket-listen (host port &key reuseaddress
@@ -251,6 +255,10 @@
 	  (jcall $@bind/ServerSocket/2 socket endpoint backlog)
 	  (jcall $@bind/ServerSocket/1 socket endpoint)))
     (make-stream-server-socket socket :element-type element-type)))
+
+(defun file-socket-listen (file &key element-type (backlog 5))
+  (declare (ignore file element-type backlog))
+  (unsupported :file-socket 'file-socket-listen))
 
 ;;; SOCKET-ACCEPT
 

@@ -348,6 +348,10 @@
                      :connected-p (and host port t))))
        usocket))))
 
+(defun file-socket-connect (file &key (type :stream) (element-type 'character) local-filename)
+  (declare (ignore file type element-type local-filename))
+  (unsupported 'file-socket 'file-socket-connect))
+
 (defun socket-listen (host port
                            &key reuseaddress
                            (reuse-address nil reuse-address-supplied-p)
@@ -371,6 +375,10 @@
                  (when (eq (second socket-res-list) :bind)
                    (error 'address-in-use-error)))))
     (make-stream-server-socket sock :element-type element-type)))
+
+(defun file-socket-listen (file &key (backlog 5) (element-type 'character))
+  (declare (ignore file backlog element-type))
+  (unsupported 'file-socket 'file-socket-listen))
 
 ;; Note: COMM::GET-FD-FROM-SOCKET contains addition socket wait operations, which
 ;; should NOT be applied on socket FDs who have already been called on W-F-I,

@@ -123,6 +123,20 @@
 	 (setf (connected-p usocket) t)
 	 usocket)))))
 
+(defun file-socket-connect (file &key (type :stream) (element-type 'character) local-filename)
+  (with-mapped-conditions ()
+    (let ((sock (openmcl-socket:make-socket :address-family :file
+                                            :type type
+                                            :remote-filename file
+                                            :local-filename local-filename
+                                            :format (to-format element-type type)
+                                            :external-format ccl:*default-external-format*)))
+      (ecase type
+        (:stream
+         (make-stream-socket :stream sock :socket sock))
+        (:datagram
+         (make-datagram-socket sock :connected-p (when file t)))))))
+
 #-ipv6
 (defun socket-listen (host port
                       &key reuseaddress
@@ -141,6 +155,17 @@
                                  (unless (eq host *wildcard-host*)
                                    (list :local-host real-host)))))))
     (make-stream-server-socket sock :element-type element-type)))
+
+(defun file-socket-listen (file &key (backlog 5) (element-type 'character))
+  (with-mapped-conditions ()
+    (let ((sock (openmcl-socket:make-socket
+                 :adress-family :file
+                 :type :stream
+                 :connect :passive
+                 :local-filename file
+                 :backlog backlog
+                 :format (to-format element-type :stream))))
+      (make-stream-server-socket sock :element-type element-type))))
 
 (defmethod socket-accept ((usocket stream-server-usocket) &key element-type)
   (declare (ignore element-type)) ;; openmcl streams are bi/multivalent

@@ -13,7 +13,9 @@
              #:+max-datagram-packet-size+
 
              #:socket-connect ; socket constructors and methods
+             #:file-socket-connect
              #:socket-listen
+             #:file-socket-listen
              #:socket-accept
              #:socket-close
              #:socket-shutdown

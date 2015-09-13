@@ -35,12 +35,20 @@
               :feature '(protocol :datagram)
               :context 'socket-connect)))))
 
+(defun file-socket-connect (file &key (type :stream) (element-type 'character) local-filename)
+  (declare (ignore file type element-type local-filename))
+  (unsupported 'file-socket 'file-socket-connect))
+
 (defun socket-listen (host port
                            &key reuseaddress
                            (reuse-address nil reuse-address-supplied-p)
                            (backlog 5)
                            (element-type 'character))
   (unimplemented 'socket-listen 'mocl))
+
+(defun file-socket-listen (file &key (backlog 5) (element-type 'character))
+  (declare (ignore file backlog element-type))
+  (unsupported 'file-socket 'file-socket-listen))
 
 (defmethod socket-accept ((usocket stream-server-usocket) &key element-type)
   (unimplemented 'socket-accept 'mocl))

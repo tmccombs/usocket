@@ -247,6 +247,27 @@ happen. Use with care."
 	  ,timeout
 	  (return-from ,block ,timeout-form)))))
 
+(defun %get-socket-stream (socket element-type)
+  (sb-bsd-sockets:socket-make-stream
+   socket :input t :output t
+   :buffering :full :element-type element-type
+   ;; Robert Brown <robert.brown@gmail.com> said on Aug 4, 2011:
+   ;; ... This means that SBCL streams created by usocket have a true
+   ;; serve-events property.  When writing large amounts of data to several
+   ;; streams, the kernel will eventually stop accepting data from SBCL.
+   ;; When this happens, SBCL either waits for I/O to be possible on
+   ;; the file descriptor it's writing to or queues the data to be flushed later.
+   ;; Because usocket streams specify serve-events as true, SBCL
+   ;; always queues.  Instead, it should wait for I/O to be available and
+   ;; write the remaining data to the socket.  That's what serve-events
+   ;; equal to NIL gets you.
+   ;;
+   ;; Nikodemus Siivola <nikodemus@random-state.net> said on Aug 8, 2011:
+   ;; It's set to T for purely historical reasons, and will soon change to
+   ;; NIL in SBCL. (The docstring has warned of T being a temporary default
+   ;; for as long as the :SERVE-EVENTS keyword argument has existed.)
+   :serve-events nil))
+
 (defun socket-connect (host port &key (protocol :stream) (element-type 'character)
                        timeout deadline (nodelay t nodelay-specified)
                        local-host local-port
@@ -301,25 +322,7 @@ happen. Use with care."
 		(sb-bsd-sockets:socket-connect socket (host-to-vector-quad host) port)
                 ;; Now that we're connected make the stream.
                 (setf (socket-stream usocket)
-                      (sb-bsd-sockets:socket-make-stream socket
-                        :input t :output t :buffering :full
-			:element-type element-type
-			;; Robert Brown <robert.brown@gmail.com> said on Aug 4, 2011:
-			;; ... This means that SBCL streams created by usocket have a true
-			;; serve-events property.  When writing large amounts of data to several
-			;; streams, the kernel will eventually stop accepting data from SBCL.
-			;; When this happens, SBCL either waits for I/O to be possible on
-			;; the file descriptor it's writing to or queues the data to be flushed later.
-			;; Because usocket streams specify serve-events as true, SBCL
-			;; always queues.  Instead, it should wait for I/O to be available and
-			;; write the remaining data to the socket.  That's what serve-events
-			;; equal to NIL gets you.
-			;;
-			;; Nikodemus Siivola <nikodemus@random-state.net> said on Aug 8, 2011:
-			;; It's set to T for purely historical reasons, and will soon change to
-			;; NIL in SBCL. (The docstring has warned of T being a temporary default
-			;; for as long as the :SERVE-EVENTS keyword argument has existed.)
-			:serve-events nil))))
+                      (%get-socket-stream socket element-type))))
              (:datagram
               (when (or local-host local-port)
                 (sb-bsd-sockets:socket-bind socket
@@ -333,6 +336,32 @@ happen. Use with care."
                   (setf (connected-p usocket) t)))))
            (setf ok t))
       ;; Clean up in case of an error.
+      (unless ok
+        (sb-bsd-sockets:socket-close socket :abort t)))
+    usocket))
+
+(defun file-socket-connect (file &key (type :stream) (element-type 'character) local-filename)
+  (let ((socket (make-instance 'sb-bsd-sockets:local-socket
+                               :type protocol))
+        usocket ok)
+    (unwind-protect
+         (with-mapped-conditions (usocket)
+           (when local-filename
+             (sb-bsd-sockets:socket-bind socket local-filename))
+           (ecase type
+             (:stream
+              (setf usocket (make-stream-socket :socket socket :stream *dummy-stream*))
+              (sb-bsd-sockets:socket-connect socket file)
+              ;; Now that we are connected make the stream.
+              (setf (socket-stream usocket)
+                    (%get-socket-stream socket :element-type element-type)))
+             (:datagram
+              (setf (usocket (make-datagram-socket socket)))
+              (when file
+                (sb-bsd-sockets:socket-connect socket file)
+                (setf (connected-p usocket) t))))
+           (setf ok t)
+      ;;Clean up in case of an error.
       (unless ok
         (sb-bsd-sockets:socket-close socket :abort t)))
     usocket))
@@ -359,6 +388,18 @@ happen. Use with care."
           (make-stream-server-socket sock :element-type element-type))
       (t (c)
         ;; Make sure we don't leak filedescriptors
+        (sb-bsd-sockets:socket-close sock)
+        (error c)))))
+
+(defun file-socket-listen (file &key (backlog 5) (element-type 'character))
+  (let ((sock (make-instance 'sb-bsd-sockets:local-socket
+                             :type :stream)))
+    (handler-case
+        (with-mapped-conditions ()
+          (sb-bsd-sockets:socket-bind sock file)
+          (sb-bsd-sockets:socket-listen sock backlog)
+          (make-stream-server-socket sock :element-type element-type))
+      (t (c)
         (sb-bsd-sockets:socket-close sock)
         (error c)))))
 

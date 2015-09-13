@@ -100,6 +100,24 @@
       (:datagram
        (make-datagram-socket socket :connected-p (and host port t))))))
 
+(defun file-socket-connect (file &key (type :stream) (element-type 'character) local-filename)
+  (let ((connect (if (or (eq type :stream) file)
+                     :active
+                     :passive))
+        socket)
+    (with-mapped-conditions ()
+      (setf socket (socket:make-socket :address-family :file
+                                       :type type
+                                       :remote-filename file
+                                       :local-filename local-filename
+                                       :connect connect
+                                       :format (to-format element-type))))
+    (ecase type
+      (:stream
+       (make-stream-socket :socket socket :stream socket))
+      (:datagram
+       (make-datagram-socket socket :connected-p file)))))
+
 ;; One socket close method is sufficient,
 ;; because socket-streams are also sockets.
 (defmethod socket-close ((usocket usocket))
@@ -132,6 +150,15 @@
                                       )
                                 (when (ip/= host *wildcard-host*)
                                   (list :local-host host)))))))
+    (make-stream-server-socket sock :element-type element-type)))
+
+(defun file-socket-listen (file &key (backlog 5) (element-type 'character))
+  (let (sock (with-mapped-conditions ()
+               (socket:make-socket :connect :passive
+                                   :address-family :file
+                                   :connect :passive
+                                   :local-filename file
+                                   :format (to-format element-type))))
     (make-stream-server-socket sock :element-type element-type)))
 
 (defmethod socket-accept ((socket stream-server-usocket) &key element-type)
