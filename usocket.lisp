@@ -257,6 +257,17 @@ non-nil, bind the associated socket stream to it."
            `(let ((,stream-var (socket-stream ,socket-var)))
               ,@body))))
 
+(defmacro with-client-file-socket ((socket-var stream-var file &rest connect-args)
+                                   &body body)
+  "Bind the socket resulting from a call to `file-socket-connect' for `file'
+ with the additional arguments `connect-args' to `socket-var' and if `stream-var'
+is non-nil bind the associated socket stream to ti."
+  `(with-connected-socket (,socket-var (file-socket-connect file ,@connect-args))
+     ,(if (null stream-var)
+          `(progn ,@body)
+          `(let ((,stream-var (socket-stream ,socket-var)))
+             ,@body))))
+
 (defmacro with-server-socket ((var server-socket) &body body)
   "Bind `server-socket' to `var', ensuring socket destruction on exit.
 
@@ -271,6 +282,13 @@ The `body' is an implied progn form."
   "Bind the socket resulting from a call to `socket-listen' with arguments
 `socket-listen-args' to `socket-var'."
   `(with-server-socket (,socket-var (socket-listen ,@socket-listen-args))
+     ,@body))
+
+(defmacro with-file-socket-listener ((socket-var file &rest listen-args)
+                                     &body body)
+  "Bind the socket resulting from a call to `file-socket-listen' on `file'
+with arguments `listen-args' to `socket-var'."
+  `(with-server-socket (,socket-var (file-socket-listen file ,@socket-listen-args))
      ,@body))
 
 (defstruct (wait-list (:constructor %make-wait-list))

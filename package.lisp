@@ -40,7 +40,9 @@
              #:with-connected-socket ; convenience macros
              #:with-server-socket
              #:with-client-socket
+             #:with-client-file-socket
              #:with-socket-listener
+             #:with-file-socket-listener
 
              #:usocket ; socket object and accessors
              #:stream-usocket
