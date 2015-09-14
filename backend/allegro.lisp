@@ -114,9 +114,9 @@
                                        :format (to-format element-type))))
     (ecase type
       (:stream
-       (make-stream-socket :socket socket :stream socket))
+       (make-stream-socket :socket socket :stream socket :unix-p t))
       (:datagram
-       (make-datagram-socket socket :connected-p file)))))
+       (make-datagram-socket socket :connected-p file :unix-p t)))))
 
 ;; One socket close method is sufficient,
 ;; because socket-streams are also sockets.
@@ -159,7 +159,9 @@
                                    :connect :passive
                                    :local-filename file
                                    :format (to-format element-type))))
-    (make-stream-server-socket sock :element-type element-type)))
+    (make-stream-server-socket sock
+                               :element-type element-type
+                               :unix-p t)))
 
 (defmethod socket-accept ((socket stream-server-usocket) &key element-type)
   (declare (ignore element-type)) ;; allegro streams are multivalent
@@ -171,15 +173,27 @@
 (defmethod get-local-address ((usocket usocket))
   (hbo-to-vector-quad (socket:local-host (socket usocket))))
 
+(defmethod get-local-address ((usocket file-usocket))
+  (socket:local-filename (socket usocket)))
+
 (defmethod get-peer-address ((usocket stream-usocket))
   (hbo-to-vector-quad (socket:remote-host (socket usocket))))
+
+(defmethod get-peer-address ((usocket stream-file-usocket))
+  (socket:remote-filename usocket))
 
 (defmethod get-local-port ((usocket usocket))
   (socket:local-port (socket usocket)))
 
+(defmethod get-local-port ((usocket file-usocket))
+  nil)
+
 (defmethod get-peer-port ((usocket stream-usocket))
   #+allegro
   (socket:remote-port (socket usocket)))
+
+(defmethod get-peer-port ((usocket stream-file-usocket))
+  nil)
 
 (defmethod get-local-name ((usocket usocket))
   (values (get-local-address usocket)

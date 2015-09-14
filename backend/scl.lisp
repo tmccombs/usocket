@@ -28,16 +28,17 @@
 			   :socket socket
 			   :condition condition))))
 
-(defun %get-stream-usocket (socket element-type)
+(defun %get-stream-usocket (socket element-type &key unix-p)
   "Get a stream-usocket for a socket with an element-type"
   (let ((stream (sys:make-fd-stream socket :input t :output t
                                     :element-type element-type
                                     :buffering :full)))
-    (make-stream-socket :socket socket :stream stream)))
+    (make-stream-socket :socket socket :stream stream :unix-p unix-p)))
 
-(defun %get-datagram-usocket (socket connected-p)
+(defun %get-datagram-usocket (socket connected-p &key unix-p)
   "Get a datagram-usocket for a socket."
-  (let ((usocket (make-datagram-socket socket :connected-p connected-p)))
+  (let ((usocket (make-datagram-socket socket :connected-p connected-p
+                                       :unix-p unix-p)))
     (ext:finalize usocket #'(lambda ()
                               (when (%open-p usocket)
                                 (ext:close-socket socket))))
@@ -120,8 +121,6 @@
       (%get-stream-usocket sock (or element-type
                                     (element-type usocket))))))
 
-(defclass unix-server-stream-usocket (stream-server-usocket) ())
-
 (defun file-socket-connect (file &key (type :stream) (element-type 'character) local-filename
                                    &aux (patch-udp-p (fboundp 'ext::inet-socket-send-to)))
   (let (socket)
@@ -129,7 +128,7 @@
       (ecase type
         (:stream
          (setf socket (ext:connect-to-unix-socket file :kind :stream))
-         (%get-stream-usocket socket element-type))
+         (%get-stream-usocket socket element-type :unix-p t))
         (:datagram
          (when (not patch-udp-p)
            (unsupported '(protocol :datagram) 'file-socket-connect :minumum "1.3.9"))
@@ -139,14 +138,14 @@
                    (if local-filename
                        (ext:create-unix-listener local-filename :datagram)
                        (ext:create-unix-socket :datagram))))
-         (%get-datagram-usocket socket (and file t)))))))
+         (%get-datagram-usocket socket (and file t) :unix-p t))))))
 
 (defun file-socket-listen (file &key (backlog 5) (element-type 'character))
   (with-mapped-conditions ()
     (let ((sock (ext:create-unix-listener file :stream)))
-      (make-instance 'unix-server-stream-usocket :socket sock :element-type element-type))))
+      (make-stream-server-socket sock :element-type element-type :unix-p t))))
 
-(defmethod socket-accept ((usocket unix-server-stream-usocket) &key element-type)
+(defmethod socket-accept ((usocket stream-server-file-usocket) &key element-type)
   (with-mapped-conditions (usocket)
     (let ((sock (ext:accept-unix-connection (socket usocket))))
       (%get-stream-usocket sock (or element-type
@@ -211,11 +210,17 @@
         (ext:get-socket-host-and-port (socket usocket)))
     (values (hbo-to-vector-quad address) port)))
 
+(defmethod get-local-name ((usocket file-usocket))
+  (values nil nil))
+
 (defmethod get-peer-name ((usocket stream-usocket))
   (multiple-value-bind (address port)
       (with-mapped-conditions (usocket)
         (ext:get-peer-host-and-port (socket usocket)))
     (values (hbo-to-vector-quad address) port)))
+
+(defmethod get-peer-name ((usocket stream-file-usocket))
+  (values nil nil))
 
 (defmethod get-local-address ((usocket usocket))
   (nth-value 0 (get-local-name usocket)))

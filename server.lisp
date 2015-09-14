@@ -35,6 +35,37 @@
 	  (values (spawn-thread (or name "USOCKET Server") #'real-call) socket)
 	  (real-call)))))
 
+(defun file-socket-server (file &optional arguments
+                           &key in-new-thread (protocol :stream)
+                             ;; for datagrams
+                             (timeout 1) (max-buffer-size +max-datagram-packet-size+)
+                             ;; for stream
+                             (element-type 'character) multi-threading
+                             name)
+  "Like socket-server, but uses a file socket instead. Do not depend on *remote-host*
+and *remote-port* for a file socket."
+  (let ((socket (ecase protocol
+                  (:stream
+                   (file-socket-listen file :element-type element-type))
+                  (:datagram
+                   (fil-socket-connect nil :type :datagram
+                                       :local-filename file)))))
+    (let ((real-call
+           (ecase protocol
+             (:stream
+              (lambda ()
+                (tcp-event-loop socket function arguments
+                                :element-type element-type
+                                :multi-threading multi-threading)))
+             (:datagram
+              (lambda ()
+                (udp-event-loop socket function arguments
+                                :timeout timeout
+                                :max-buffer-size max-buffer-size)))))))
+      (if in-new-thread
+          (values (spawn-thread (or name "USOCKET Server" real-call) socket))
+          (real-call))))
+
 (defvar *remote-host*)
 (defvar *remote-port*)
 

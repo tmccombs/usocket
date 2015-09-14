@@ -123,6 +123,13 @@ for GC on implementions operate on raw socket fd.")
    (send-buffer :documentation "Private SEND buffer."))
   (:documentation "UDP (inet-datagram) socket"))
 
+(defclass file-usocket (usocket) ()
+  "The main socket class for local domain sockets.")
+
+(defclass stream-file-usocket (file-usocket stream-usocket) ())
+(defclass stream-server-file-usocket (file-usocket stream-server-usocket) ())
+(defclass datagram-file-usocket (file-usocket datagram-usocket) ())
+
 (defun usocket-p (socket)
   (typep socket 'usocket))
 
@@ -135,13 +142,16 @@ for GC on implementions operate on raw socket fd.")
 (defun datagram-usocket-p (socket)
   (typep socket 'datagram-usocket))
 
+(defun file-usocket-p (socket)
+  (typep socket 'file-usocket))
+
 (defun make-socket (&key socket)
   "Create a usocket socket type from implementation specific socket."
   (unless socket
     (error 'invalid-socket-error))
   (make-stream-socket :socket socket))
 
-(defun make-stream-socket (&key socket stream)
+(defun make-stream-socket (&key socket stream unix-p)
   "Create a usocket socket type from implementation specific socket
 and stream objects.
 
@@ -152,13 +162,16 @@ by closing the stream associated with the socket.
     (error 'invalid-socket-error))
   (unless stream
     (error 'invalid-socket-stream-error))
-  (make-instance 'stream-usocket
+  (make-instance (if unix-p
+                     'stream-file-usocket
+                     'stream-usocket)
                  :socket socket
                  :stream stream))
 
 (defun make-stream-server-socket (socket &key (element-type
                                                #-lispworks 'character
-                                               #+lispworks 'base-char))
+                                               #+lispworks 'base-char)
+                                           unix-p)
   "Create a usocket-server socket type from an
 implementation-specific socket object.
 
@@ -166,14 +179,19 @@ The returned value is a subtype of `stream-server-usocket'.
 "
   (unless socket
     (error 'invalid-socket-error))
-  (make-instance 'stream-server-usocket
+  (make-instance (if unix-p
+                     'stream-server-file-usocket
+                     'stream-server-usocket)
                  :socket socket
                  :element-type element-type))
 
-(defun make-datagram-socket (socket &key connected-p)
+(defun make-datagram-socket (socket &key connected-p
+                                      unix-p)
   (unless socket
     (error 'invalid-socket-error))
-  (make-instance 'datagram-usocket
+  (make-instance (if unix-p
+                     'datagram-file-usocket
+                     'datagram-usocket)
                  :socket socket
                  :connected-p connected-p))
 

@@ -133,9 +133,9 @@
                                             :external-format ccl:*default-external-format*)))
       (ecase type
         (:stream
-         (make-stream-socket :stream sock :socket sock))
+         (make-stream-socket :stream sock :socket sock :unix-p t))
         (:datagram
-         (make-datagram-socket sock :connected-p (when file t)))))))
+         (make-datagram-socket sock :connected-p (when file t) :unix-p t))))))
 
 #-ipv6
 (defun socket-listen (host port
@@ -165,7 +165,7 @@
                  :local-filename file
                  :backlog backlog
                  :format (to-format element-type :stream))))
-      (make-stream-server-socket sock :element-type element-type))))
+      (make-stream-server-socket sock :element-type element-type :unix-p t))))
 
 (defmethod socket-accept ((usocket stream-server-usocket) &key element-type)
   (declare (ignore element-type)) ;; openmcl streams are bi/multivalent
@@ -225,14 +225,26 @@
 (defmethod get-local-address ((usocket usocket))
   (usocket-host-address (openmcl-socket:local-host (socket usocket))))
 
+(defmethod get-local-address ((usocket file-usocket))
+  nil)
+
 (defmethod get-peer-address ((usocket stream-usocket))
   (usocket-host-address (openmcl-socket:remote-host (socket usocket))))
+
+(defmethod get-peer-address ((usocket stream-file-usocket))
+  nil)
 
 (defmethod get-local-port ((usocket usocket))
   (openmcl-socket:local-port (socket usocket)))
 
+(defmethod get-local-port ((usocket file-usocket))
+  nil)
+
 (defmethod get-peer-port ((usocket stream-usocket))
   (openmcl-socket:remote-port (socket usocket)))
+
+(defmethod get-peer-port ((usocket stream-file-usocket))
+  nil)
 
 (defmethod get-local-name ((usocket usocket))
   (values (get-local-address usocket)

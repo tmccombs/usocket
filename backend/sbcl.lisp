@@ -350,7 +350,7 @@ happen. Use with care."
              (sb-bsd-sockets:socket-bind socket local-filename))
            (ecase type
              (:stream
-              (setf usocket (make-stream-socket :socket socket :stream *dummy-stream*))
+              (setf usocket (make-stream-socket :socket socket :stream *dummy-stream* :unix-p t))
               (sb-bsd-sockets:socket-connect socket file)
               ;; Now that we are connected make the stream.
               (setf (socket-stream usocket)
@@ -398,7 +398,7 @@ happen. Use with care."
         (with-mapped-conditions ()
           (sb-bsd-sockets:socket-bind sock file)
           (sb-bsd-sockets:socket-listen sock backlog)
-          (make-stream-server-socket sock :element-type element-type))
+          (make-stream-server-socket sock :element-type element-type :unix-p t))
       (t (c)
         (sb-bsd-sockets:socket-close sock)
         (error c)))))

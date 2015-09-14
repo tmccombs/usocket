@@ -29,6 +29,7 @@
              #:socket-send    ; udp function (send)
              #:socket-receive ; udp function (receive)
              #:socket-server  ; udp server
+             #:file-socket-server
              #:socket-option  ; 0.6.x
 
              #:wait-for-input ; waiting for input-ready state (select() like)
@@ -51,12 +52,17 @@
              #:socket-stream
              #:datagram-usocket
              #:socket-state ; 0.6.4
+             #:file-usocket
+             #:stream-file-usocket
+             #:stream-server-file-usocket
+             #:datagram-file-usocket
 
              ;; predicates (for version 0.6 or 1.0 ?)
              #:usocket-p
              #:stream-usocket-p
              #:stream-server-usocket-p
              #:datagram-usocket-p
+             #:file-usocket-p
 
              #:host-byte-order ; IPv4 utility functions
              #:hbo-to-dotted-quad

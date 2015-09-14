@@ -50,7 +50,7 @@
                                                :socket socket
                                                :condition condition))))
 
-(defun %get-stream-usocket (socket element-type)
+(defun %get-stream-usocket (socket element-type &key unix-p)
   "Get the stream-usocket for a socket FD."
   (if socket
       (let ((stream (sys:make-fd-stream socket :input t :output t
@@ -58,14 +58,16 @@
                                         :buffering :full)))
         ;;###FIXME the above line probably needs an :external-format
         (make-stream-socket :socket socket
-                            :stream stream))
+                            :stream stream
+                            :unix-p unix-p))
       (let ((err (unix:unix-errno)))
         (when err (cmucl-map-socket-error err)))))
 
-(defun %get-datagram-usocket (socket connected-p)
+(defun %get-datagram-usocket (socket connected-p &key unix-p)
   "Get the datagram-usocket for a socket FD."
   (if socket
-      (let ((usocket (make-datagram-socket socket :connected-p connected-p)))
+      (let ((usocket (make-datagram-socket socket :connected-p connected-p
+                                           :unix-p unix-p)))
         (ext:finalize usocket #'(lambda () (when (%open-p usocket)
                                              (ext:close-socket socket))))
         usocket)
@@ -80,7 +82,7 @@
 		       (local-bind-p (fboundp 'ext::bind-inet-socket)))
   (when timeout (unsupported 'timeout 'socket-connect))
   (when deadline (unsupported 'deadline 'socket-connect))
-  (when (and nodelay-specified 
+  (when (and nodelay-specified
              (not (eq nodelay :if-supported)))
     (unsupported 'nodelay 'socket-connect))
   (when (and local-host-p (not local-bind-p))
@@ -127,14 +129,14 @@
       (ecase type
         (:stream
          (setf socket (ext:connect-to-unix-socket file :stream))
-         (%get-stream-usocket socket))
+         (%get-stream-usocket socket element-type :unix-p t))
         (:datagram
          (setf socket (if file
                           (ext:connect-to-unix-socket file :datagram)
                           (if local-filename
                               (ext:create-unix-listener local-filename :datagram)
                               (ext:create-unix-socket :datagram))))
-         (%get-datagram-usocket socket element-type))))))
+         (%get-datagram-usocket socket (and file t) :unix-p t))))))
 
 (defun socket-listen (host port
                            &key reuseaddress
@@ -153,14 +155,12 @@
                                   (host-to-hbo host))))))))
    (make-stream-server-socket server-sock :element-type element-type)))
 
-(defclass unix-server-stream-usocket (stream-server-usocket) ())
-
 (defun file-socket-listen (file &key (backlog 5) (element-type 'character))
   (with-mapped-conditions ()
     (let ((sock (ext:create-unix-listener file :stream :backlog backlog)))
-      (make-instance 'unix-server-stream-usocket
-                     :socket server-sock
-                     :element-type element-type))))
+      (make-stream-server-socket server-sock
+                                 :element-type element-type
+                                 :unix-p t))))
 
 (defmethod socket-accept ((usocket stream-server-usocket) &key element-type)
   (with-mapped-conditions (usocket)
@@ -168,7 +168,7 @@
       (%get-stream-usocket sock (or element-type
                                     (element-type usocket))))))
 
-(defmethod socket-accept ((usocket unix-server-stream-usocket) &key element-type)
+(defmethod socket-accept ((usocket stream-server-file-usocket) &key element-type)
   (with-mapped-conditions (usocket)
     (let ((sock (ext:accept-unix-connection (socket usocket))))
       (%get-stream-usocket sock (or element-type
@@ -246,11 +246,18 @@
       (ext:get-socket-host-and-port (socket usocket))
     (values (hbo-to-vector-quad address) port)))
 
+(defmethod get-local-name ((usocket file-usocket))
+  ;; just use nil for both since we can't get he actual filename
+  (values nil nil))
+
 (defmethod get-peer-name ((usocket stream-usocket))
   (multiple-value-bind
       (address port)
       (ext:get-peer-host-and-port (socket usocket))
     (values (hbo-to-vector-quad address) port)))
+
+(defmethod get-peer-name ((usocket stream-file-usocket))
+  (values nil nil))
 
 (defmethod get-local-address ((usocket usocket))
   (nth-value 0 (get-local-name usocket)))
