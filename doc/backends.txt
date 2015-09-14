@@ -14,8 +14,14 @@ Functions:
  - socket-listen
  - get-hosts-by-name [ optional ]
  - get-host-by-address [ optional ]
+ - file-socket-connect
+ - file-socket-listen
 
  - wait-for-input-internal (new in 0.4.x)
+
+For systems that don't support file sockets (UNIX sockets)
+file-socket-connect and file-socket-listen should signal a
+unsupported error.
 
 Methods:
 

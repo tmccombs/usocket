@@ -695,3 +695,29 @@ streams to be created by `socket-accept'.  `reuseaddress' is supported for
 backward compatibility (but deprecated); when both `reuseaddress' and
 `reuse-address' have been specified, the latter takes precedence.
 ")
+
+;; Documentation for the function
+;;
+;; (defun FILE-SOCKET-CONNECT (file &key (type :stream) (element-type 'character) local-filename))
+;;
+(setf (documentation 'file-socket-connect 'function)
+      "Connect to a local domain socket (UNIX socket) located at the path `file'.
+`file' and `local-filename' if supplied are assumed to be either a string or nil.
+
+If `local-filename' is supplied, the socket is bound to that file as the local file.
+This is primarily useful for creating datagram server sockets. Typically you would either
+supply `file' or `local-filename', not both. (`file' is nil if not specified).
+
+`type' should either be the keyword :stream or :datagram.
+
+`element-type' specifies the element type of the stream created for the socket if a
+stream socket. Default is 'character.")
+
+;; Documentation for the function
+;;
+;; (defun FILE-SOCKET-LISTEN (file &key (backlog 5) (element-type 'character)))
+;;
+(setf (documentation 'file-socket-listen 'function)
+      "Bind to a local domain socket (UNIX socket) located at the path `file'.
+`file' MUST be a string specifying a location for a socket file that is not currently
+in use. The `backlog' and `element-type' arguments behave the same as in `socket-listen'.")
